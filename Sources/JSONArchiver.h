@@ -9,12 +9,64 @@
 @import Foundation;
 
 
+
 FOUNDATION_EXPORT double JSONArchiverVersionNumber;
 FOUNDATION_EXPORT const unsigned char JSONArchiverVersionString[];
 
 
 
+//! NSCoder that writes arbitrary object graph into archive in JSON format. Preserves classes and cyclic references.
+//! This archiver is intended as drop-in replacement for NSKeyedArchiver, so it supports all non-legacy features of archivation.
 @interface JSONArchiver : NSCoder
+
+//! Value is YES, this class supports both indexed and keyed encoding. Keyed coding is recommended except in case of single root.
+@property (readonly) BOOL allowsKeyedCoding;
+
+//! Convenience method to create JSON archive data from given root object, optionally pretty-printed.
++ (NSData *)archivedDataWithRootObject:(id<NSCoding>)rootObject pretty:(BOOL)prettyPrinted;
+//! Convenience method to write JSON archive data of given root object to provided URL, optionally pretty-printed.
++ (BOOL)archiveRootObject:(id<NSCoding>)rootObject toURL:(NSURL *)fileURL pretty:(BOOL)prettyPrinted;
+
+//! Default value is NO. Set this property to YES to produce JSON with newlines and space indentation.
+@property BOOL shouldPrettyPrint;
+
+//! Contains valid JSON object after encoding any number of root objects.
+@property (readonly) id archive;
+//! JSON data in UTF-8 encoding created from `.archive` property, optionally pretty-printed.
+@property (readonly) NSData *archivedData;
+//! JSON string in UTF-8 encoding created from `.archive` property, optionally pretty-printed.
+@property (readonly) NSString *archivedString;
+//! Writes JSON data in UTF-8 encoding created from `.archive` property into file at given URL. Return success.
+- (BOOL)writeArchiveToURL:(NSURL *)fileURL;
+//! Writes JSON data in UTF-8 encoding created from `.archive` property into given opened stream. Return success.
+- (BOOL)writeArchiveToStream:(NSOutputStream *)openedStream;
+
+//! This archiver supports all methods that begin with “encode”, but the following are recommended.
+
+//! The main encoding method for everything. All other “encode” method invoke this one.
+//! – NSNumbers created from BOOL produce JSON true/false values.
+//! – NSNumbers with value of NaN or infinity are handled in JSON-compatible manner.
+//! – Other NSNumbers are encoded as standard JSON number values.
+//! – Passing nil object produces JSON null value.
+//! – Encoding NSNull produces special JSON value, not null.
+//! – Immutable NSStrings and NSArrays are typically encoded directly and are not referenced across archive.
+//! – Other objects are encoded using NSCoding method into JSON object values.
+//! – Key must not begin with '#' character, which is reserved for archive internal structure.
+- (void)encodeObject:(id<NSCoding>)object forKey:(NSString *)key;
+
+//! Recommended way to encode single root object. Multiple root objects should be encoded using -encodeObject:forKey: method.
+- (void)encodeRootObject:(id<NSCoding>)rootObject;
+//! Encodes object only if it’s also encoded unconditionally by another object in the object graph. Cannot be used to encode root.
+- (void)encodeConditionalObject:(id<NSCoding>)object forKey:(NSString *)key;
+//! Convenience method that wraps given value in NSNumber and invokes -encodeObject:forKey: method.
+- (void)encodeBool:(BOOL)boolean forKey:(NSString *)key;
+//! Convenience method that wraps given value in NSNumber and invokes -encodeObject:forKey: method.
+- (void)encodeInteger:(NSInteger)integer forKey:(NSString *)key;
+//! Convenience method that wraps given value in NSNumber and invokes -encodeObject:forKey: method.
+- (void)encodeDouble:(double)number forKey:(NSString *)key;
+
+//! Methods that begin with “decode” are not supported. Also, -containsValueForKey:, .decodingFailurePolicy and -failWithError: are not supported.
+
 
 @end
 

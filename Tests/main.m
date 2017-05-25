@@ -10,10 +10,24 @@
 @import JSONArchiver;
 
 
+#define var  __auto_type
+#define let  __auto_type const
+
 
 int main(__unused int argc, __unused const char * argv[]) {
     @autoreleasepool {
-        NSLog(@"Hello, World! %@", [JSONArchiver class]);
+        
+        var archiver = [JSONArchiver new];
+        archiver.shouldPrettyPrint = YES;
+        
+        NSLog(@"@YES: %i", (id)@YES == (id)kCFBooleanTrue);
+        NSLog(@"@(YES): %i", (id)@(YES) == (id)kCFBooleanTrue);
+        NSLog(@"@1: %i", (id)@1 == (id)kCFBooleanTrue);
+        NSLog(@"@(1): %i", (id)@((BOOL)1) == (id)kCFBooleanTrue);
+        NSLog(@"bool: %i", (id)[NSNumber numberWithBool:1] == (id)kCFBooleanTrue);
+        NSLog(@"@(1): %i", (id)[NSNumber numberWithInt:YES] == (id)kCFBooleanTrue);
+        
+        NSLog(@"JSON:\n%@", archiver.archivedString);
     }
     return 0;
 }
