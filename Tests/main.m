@@ -29,8 +29,14 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:self.title forKey:@"title"];
-    [encoder encodeObject:self.next forKey:@"next"];
+    [encoder encodeObject:[NSDate new] forKey:@"date"];
+    [encoder encodeObject:[NSURL URLWithString:@"http://apple.com"] forKey:@"URL"];
+    [encoder encodeObject:@{
+                            @"A": @"B",
+                            @"C": @"D",
+                            @"E": @"F",
+                            @"G": @"H",
+                            } forKey:@"set"];
 }
 
 @end
@@ -53,11 +59,11 @@ int main(__unused int argc, __unused const char * argv[]) {
         
         var archiver = [JSONArchiver new];
         archiver.shouldPrettyPrint = YES;
-        archiver.shouldCompactRoot = YES;;
+        //archiver.shouldCompactRoot = YES;;
         archiver.shouldIncludeDebuggingInfo = YES;
-        archiver.shouldOmitNulls = YES;
+        //archiver.shouldOmitNulls = YES;
         
-        [archiver encodeObject:testA];
+        [archiver encodeObject:testC];
         
         NSLog(@"JSON:\n%@", archiver.JSONString);
     }

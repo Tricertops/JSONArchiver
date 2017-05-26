@@ -18,11 +18,13 @@
 
 
 
+#pragma mark - Containers
+
+
+
 @interface JSONArchiverContainer : NSObject
 
 
-@property NSMutableDictionary<NSString *, id> *dictionary;
-- (BOOL)containsKey:(NSString *)key;
 - (void)storeJSONObject:(id)object forKey:(NSString *)key;
 
 @property NSUInteger nextIndex;
@@ -33,19 +35,19 @@
 
 
 
+@interface JSONArchiverKeyedContainer : JSONArchiverContainer
 
-
-@interface JSONArchiverSelector : NSObject
-
-@property SEL selector;
+@property (readonly) NSMutableDictionary<NSString *, id> *dictionary;
 
 @end
 
 
-@implementation JSONArchiverSelector
+
+@interface JSONArchiverIndexedContainer : JSONArchiverContainer
+
+@property (readonly) NSMutableArray<id> *array;
 
 @end
-
 
 
 
@@ -57,14 +59,8 @@
     self = [super init];
     
     self->_nextIndex = 0;
-    self->_dictionary = [NSMutableDictionary new];
     
     return self;
-}
-
-
-- (BOOL)containsKey:(NSString *)key {
-    return (self.dictionary[key] != nil);
 }
 
 
@@ -75,8 +71,29 @@
 }
 
 
+- (void)storeJSONObject:(__unused id)object forKey:(__unused NSString *)key {
+    NSAssert(NO, @"Abstract.");
+}
+
+
+@end
+
+
+
+@implementation JSONArchiverKeyedContainer
+
+
+- (instancetype)init {
+    self = [super init];
+    
+    self->_dictionary = [NSMutableDictionary new];
+    
+    return self;
+}
+
+
 - (void)storeJSONObject:(id)object forKey:(NSString *)key {
-    NSAssert( ! [self containsKey:key], @"Duplicate key: %@", key);
+    NSAssert(self.dictionary[key] == nil, @"Duplicate key: %@", key);
     self.dictionary[key] = object;
 }
 
@@ -84,6 +101,36 @@
 @end
 
 
+
+@implementation JSONArchiverIndexedContainer
+
+
+- (instancetype)init {
+    self = [super init];
+    
+    self->_array = [NSMutableArray new];
+    
+    return self;
+}
+
+
+- (id)storage {
+    return self.array;
+}
+
+
+- (void)storeJSONObject:(id)object forKey:(__unused NSString *)key {
+    [self.array addObject:object ?: NSNull.null];
+}
+
+
+@end
+
+
+
+
+
+#pragma mark - Private Interface
 
 
 
@@ -96,7 +143,7 @@
 @property (readonly) NSMutableIndexSet *conditionalTopIndexes;
 
 //! Container that holds root objects. When needed, it is archived as top-level object.
-@property (readonly) JSONArchiverContainer *rootContainer;
+@property (readonly) JSONArchiverKeyedContainer *rootContainer;
 //! Flag that indicates whether the root container needs to be archived.
 @property BOOL requiresRootInArchive;
 //! Flag that indicates whether the receiver encodes root object. Alters some behavior.
@@ -156,10 +203,10 @@
     
     self->_topJSONObjects = [NSMutableArray new];
     self->_conditionalTopIndexes = [NSMutableIndexSet new];
-    self->_rootContainer = [JSONArchiverContainer new];
+    self->_rootContainer = [JSONArchiverKeyedContainer new];
     self->_nestedContainers = [NSMutableArray new];
     
-    [self.rootContainer storeJSONObject:@"root" forKey:@"#special"];
+    [self.rootContainer storeJSONObject:@"#root" forKey:@"#root"];
     
     return self;
 }
@@ -214,8 +261,8 @@
         //! We simply prefix the key with another # symbol. So during decoding ## prefix needs to be shortened to #.
         return [@"#" stringByAppendingString:key];
     }
-    //! All other keys are allowed.
-    return key;
+    //! All other keys are allowed, but copied for safety.
+    return [key copy];
 }
 
 
@@ -267,9 +314,10 @@
     //TODO: Find existing top-level object and use its reference.
     //TODO: Find how NSKeyedArchiver treats -isEqual: objects.
     //TODO: If object is referenced, remove it from conditional objects (replace with null).
+    //TODO: For large NSString/NSData/NSArray, even if there is equal mutable copy, reuse it.
     
-    //! We to create new top-level object.
-    var container = [JSONArchiverContainer new];
+    //! We need to create new top-level object.
+    var container = [JSONArchiverKeyedContainer new];
     let index = self.topJSONObjects.count;
     [self.topJSONObjects addObject:container.dictionary];
     
@@ -286,13 +334,63 @@
         [self.conditionalTopIndexes addIndex:index];
     }
     //! Store special JSON reference in the current container.
-    [self.currentContainer storeJSONObject:[self referenceJSONForIndex:index] forKey:key];
+    [self.currentContainer storeJSONObject:@{ @"#ref": @(index) } forKey:key];
     
     //! Now we push new container, invoke encoding recursively and then pop that container.
     [self.nestedContainers addObject:container];
     [container storeJSONObject:NSStringFromClass(class) forKey:@"#class"];
-    [object encodeWithCoder:self]; // Anything could happen here.
-    NSAssert(self.nestedContainers.lastObject == container, @"Inconsistent nestign of containers.");
+    
+    //! Some classes can be too big to be replaced nested value, so we handle their top-level behavior.
+    if ([class isSubclassOfClass:NSString.class]) {
+        //! Default implementation of NSString stores underlaying bytes.
+        let string = (NSString *)object;
+        [container storeJSONObject:[string copy] forKey:@"#contents"];
+        //! Optionally, store extra debugging info.
+        if (self.shouldIncludeDebuggingInfo) {
+            [container storeJSONObject:@(string.length) forKey:@"#length"];
+        }
+    }
+    else if (   [class isSubclassOfClass:NSArray.class]
+             || [class isSubclassOfClass:NSSet.class]
+             || [class isSubclassOfClass:NSOrderedSet.class]) {
+        //! Default implementations of these classes store all objects as keys. We create special indexed container encode all objects in it.
+        var indexedContainer = [JSONArchiverIndexedContainer new];
+        [self.nestedContainers addObject:indexedContainer];
+        for (NSObject<NSCoding> *child in (id<NSFastEnumeration>)object) {
+            //! We pass no keys and this indexed container uses array.
+            [self internalEncodeObject:child forKey:nil conditional:NO];
+        }
+        [self.nestedContainers removeLastObject];
+        [container storeJSONObject:indexedContainer.array forKey:@"#objects"];
+        
+        //! Optionally, store extra debugging info.
+        if (self.shouldIncludeDebuggingInfo) {
+            [container storeJSONObject:@(((NSArray *)object).count) forKey:@"#count"];
+        }
+    }
+    else if ([class isSubclassOfClass:NSDictionary.class]) {
+        //! Default implementation of NSDictionary stores all keys and values under keys.
+        let dictionary = (NSDictionary *)object;
+        let keys = dictionary.allKeys;
+        let values = [dictionary objectsForKeys:keys notFoundMarker:NSNull.null];
+        [self internalEncodeObject:keys forKey:@"#keys" conditional:NO];
+        [self internalEncodeObject:values forKey:@"#values" conditional:NO];
+        //! We could push this further and if the dictionary keys are all NSStrings, use native JSON structure.
+    }
+    else if ([class isSubclassOfClass:NSData.class]) {
+        //! Default implementation of NSData invokes -encodeBytes:length:forKey:, which produces recursion.
+        let data = (NSData *)object;
+        [container storeJSONObject:[self base64:data] forKey:@"#base64"];
+        //! Optionally, store extra debugging info.
+        if (self.shouldIncludeDebuggingInfo) {
+            [container storeJSONObject:@(data.length) forKey:@"#length"];
+        }
+    }
+    else {
+        //! This is that place where we invoke NSCoding. Anything could happen there!
+        [object encodeWithCoder:self];
+    }
+    NSAssert(self.nestedContainers.lastObject == container, @"Inconsistent nesting of containers.");
     [self.nestedContainers removeLastObject];
 }
 
@@ -304,9 +402,9 @@
     if (object == nil) {
         return NSNull.null;
     }
-    //! NSNull is rare, so it’s encoded as special object.
+    //! NSNull is rare, but small so it’s encoded as nested.
     if (object == NSNull.null) {
-        return [self specialJSON:@"NSNull"];
+        return @{ @"#class": @"NSNull" };
     }
     //! All numbers are handled, some need special JSON compatibility values.
     if (class == NSNumber.class) {
@@ -317,13 +415,13 @@
         }
         //! NaNs and Infinity are not supported in JSON, so we use special placeholders.
         if (object == (id)kCFNumberNaN) {
-            return [self specialJSON:@"NaN"];
+            return @{ @"#number": @"NaN" };
         }
         if (object == (id)kCFNumberPositiveInfinity) {
-            return [self specialJSON:@"+Inf"];
+            return @{ @"#number": @"+Inf" };
         }
         if (object == (id)kCFNumberNegativeInfinity) {
-            return [self specialJSON:@"-Inf"];
+            return @{ @"#number": @"-Inf" };
         }
         //! All other NSNumbers are supported directly.
         return object;
@@ -341,46 +439,31 @@
     }
     //! NSData needs special JSON object that holds base64 encoded data.
     if (class == NSData.class) {
-        return [self base64JSON:(NSData *)object];
+        let data = (NSData *)object;
+        return (data.length > 512? nil : @{ @"#base64": [self base64:data] });
+    }
+    //! NSDate use special JSON object with UNIX timestamp.
+    if (class == NSDate.class) {
+        let date = (NSDate *)object;
+        return @{ @"#date": @(date.timeIntervalSince1970) };
+    }
+    //! Ansolute NSURL use special JSON object with path timestamp.
+    if (class == NSURL.class) {
+        let URL = (NSURL *)object;
+        return URL.baseURL? nil : @{ @"#url": URL.absoluteString ?: @"" };
     }
     //! Classes are encoded using special object.
     if (object_isClass(object)) {
-        return [self classJSON:(Class)object];
-    }
-    //! Selectors are encoded using special object.
-    if (class == JSONArchiverSelector.class) {
-        return [self selectorJSON:((JSONArchiverSelector *)object).selector];
+        return @{ @"#metaclass": NSStringFromClass((Class)object) };
     }
     //! All others will need to use NSCoding via -encodeWithCoder: method.
     return nil;
 }
 
 
-- (NSDictionary<NSString *, NSString *> *)specialJSON:(NSString *)name {
-    return @{ @"#special": name ?: @"" };
-}
-
-
-- (NSDictionary<NSString *, NSString *> *)classJSON:(Class)class {
-    return @{ @"#meta": NSStringFromClass(class) };
-}
-
-
-- (NSDictionary<NSString *, NSString *> *)selectorJSON:(SEL)selector {
-    return @{ @"#selector": NSStringFromSelector(selector) };
-}
-
-
-- (NSDictionary<NSString *, NSString *> *)base64JSON:(NSData *)data {
-    let prettyOptions = (NSDataBase64Encoding76CharacterLineLength | NSDataBase64EncodingEndLineWithLineFeed);
-    let options = (self.shouldPrettyPrint? prettyOptions : kNilOptions);
-    let base64 = [data base64EncodedStringWithOptions:options];
-    return @{ @"#base64": base64 ?: @"" };
-}
-
-
-- (NSDictionary<NSString *, NSNumber *> *)referenceJSONForIndex:(NSUInteger)index {
-    return @{ @"#ref": @(index) };
+- (NSString *)base64:(NSData *)data {
+    // I tried to respect pretty-print, but JSON removes newlines.
+    return [data base64EncodedStringWithOptions:kNilOptions] ?: @"";
 }
 
 
@@ -394,7 +477,7 @@
         //! The that single object is root list, remove special mark and return it.
         if (topObjects.firstObject == self.rootContainer.dictionary) {
             var rootList = (NSMutableDictionary *)[topObjects.firstObject mutableCopy];
-            [rootList removeObjectForKey:@"#special"];
+            [rootList removeObjectForKey:@"#root"];
             return rootList;
         }
         //! Other top-lever object should be fine.
@@ -613,9 +696,8 @@
         return *(Class *)address;
     }
     if (strcmp(type, @encode(SEL)) == 0) {
-        var wrapper = [JSONArchiverSelector new];
-        wrapper.selector = *(SEL *)address;
-        return wrapper;
+        let selector = *(SEL *)address;
+        return NSStringFromSelector(selector);
     }
     
     //! Unknown type, pointers, bitfields.

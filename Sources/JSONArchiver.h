@@ -54,10 +54,11 @@ FOUNDATION_EXPORT const unsigned char JSONArchiverVersionString[];
 //! – NSNumbers with value of NaN or infinity are handled in JSON-compatible manner.
 //! – Other NSNumbers are encoded as standard JSON number values.
 //! – Passing nil object produces JSON null value.
-//! – Encoding NSNull produces special JSON value, not null.
-//! – Immutable NSStrings and NSArrays are typically encoded directly and are not referenced across archive.
+//! – Encoding NSNull produces special nested JSON value, not null.
+//! – Short immutable NSStrings and NSArrays are nested directly without cross-referenced.
+//! – NSArray, NSSet, NSDictionary and similar Foundation collections have improved encoded structure that uses JSON array.
+//! – NSData, NSURL, NSDate and similar small objects are encoded more effectively.
 //! – Other objects are encoded using NSCoding method into JSON object values.
-//! – Key must not begin with '#' character, which is reserved for archive internal structure.
 - (void)encodeObject:(id<NSCoding>)object forKey:(NSString *)key;
 
 //! Recommended way to encode single root object. Multiple root objects should be encoded using -encodeObject:forKey: method.
