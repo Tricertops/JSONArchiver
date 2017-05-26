@@ -14,22 +14,62 @@
 #define let  __auto_type const
 
 
+@interface TestObject : NSObject <NSCoding>
+
+@property NSString *title;
+@property TestObject *next;
+
+@end
+
+
+@implementation TestObject
+
+- (instancetype)initWithCoder:(NSCoder *)decoder {
+    return [self init];
+}
+
+- (void)encodeWithCoder:(NSCoder *)encoder {
+    [encoder encodeObject:self.title forKey:@"title"];
+    [encoder encodeObject:self.next forKey:@"next"];
+}
+
+@end
+
+
 int main(__unused int argc, __unused const char * argv[]) {
     @autoreleasepool {
         
+        var testA = [TestObject new];
+        testA.title = @"A";
+        
+        var testB = [TestObject new];
+        testB.title = @"B";
+        
+        var testC = [TestObject new];
+        testC.title = @"C";
+        
+        testA.next = testB;
+        testB.next = testC;
+        
         var archiver = [JSONArchiver new];
         archiver.shouldPrettyPrint = YES;
+        archiver.shouldIncludeDebuggingInfo = YES;
         
-        NSLog(@"@YES: %i", (id)@YES == (id)kCFBooleanTrue);
-        NSLog(@"@(YES): %i", (id)@(YES) == (id)kCFBooleanTrue);
-        NSLog(@"@1: %i", (id)@1 == (id)kCFBooleanTrue);
-        NSLog(@"@(1): %i", (id)@((BOOL)1) == (id)kCFBooleanTrue);
-        NSLog(@"bool: %i", (id)[NSNumber numberWithBool:1] == (id)kCFBooleanTrue);
-        NSLog(@"@(1): %i", (id)[NSNumber numberWithInt:YES] == (id)kCFBooleanTrue);
+        [archiver encodeObject:testA];
         
-        NSLog(@"JSON:\n%@", archiver.archivedString);
+        NSLog(@"JSON:\n%@", archiver.JSONString);
     }
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
 
 

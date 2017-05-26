@@ -27,19 +27,23 @@ FOUNDATION_EXPORT const unsigned char JSONArchiverVersionString[];
 //! Convenience method to write JSON archive data of given root object to provided URL, optionally pretty-printed.
 + (BOOL)archiveRootObject:(id<NSCoding>)rootObject toURL:(NSURL *)fileURL pretty:(BOOL)prettyPrinted;
 
-//! Default value is NO. Set this property to YES to produce JSON with newlines and space indentation.
+//! Default value is NO. Set this property to YES to produce JSON with newlines and space indentation. Also affects base64 wrapping.
 @property BOOL shouldPrettyPrint;
+//! Defaults value is YES, so the archiver will compact root elements of JSON for nicer output in some cases.
+@property BOOL shouldCompactRoot;
+//! Defaults value is NO. If set to YES, extra keys will be added to root objects for easier human inspection.
+@property BOOL shouldIncludeDebuggingInfo;
 
 //! Contains valid JSON object after encoding any number of root objects.
-@property (readonly) id archive;
-//! JSON data in UTF-8 encoding created from `.archive` property, optionally pretty-printed.
-@property (readonly) NSData *archivedData;
-//! JSON string in UTF-8 encoding created from `.archive` property, optionally pretty-printed.
-@property (readonly) NSString *archivedString;
-//! Writes JSON data in UTF-8 encoding created from `.archive` property into file at given URL. Return success.
-- (BOOL)writeArchiveToURL:(NSURL *)fileURL;
-//! Writes JSON data in UTF-8 encoding created from `.archive` property into given opened stream. Return success.
-- (BOOL)writeArchiveToStream:(NSOutputStream *)openedStream;
+@property (readonly) id JSON;
+//! JSON data in UTF-8 encoding created from JSON property, optionally pretty-printed.
+@property (readonly) NSData *JSONData;
+//! JSON string in UTF-8 encoding created from JSON property, optionally pretty-printed.
+@property (readonly) NSString *JSONString;
+//! Writes JSON data in UTF-8 encoding created from JSON property into file at given URL. Return success.
+- (BOOL)writeJSONToURL:(NSURL *)fileURL;
+//! Writes JSON data in UTF-8 encoding created from JSON property into given opened stream. Return success.
+- (BOOL)writeJSONToStream:(NSOutputStream *)openedStream;
 
 //! This archiver supports all methods that begin with “encode”, but the following are recommended.
 
