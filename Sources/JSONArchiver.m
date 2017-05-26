@@ -230,10 +230,16 @@
     //! If we have a replacement, we will store it directly in current container.
     id replacement = [self replacementJSONForObject:object class:class];
     
+    BOOL isKeyed = (key.length > 0);
+    
+    //! When encoding nil, we can sometimes ignore it. Non-key encoding requires null values.
+    if (object == nil && isKeyed && self.shouldOmitNulls) {
+        return;
+    }
+    
     //! If first root is keyed, we store list of roots as first top-level object.
     if (self.isRoot) {
         BOOL hasMultipleRoots = (self.rootContainer.dictionary.count > 1); //! One is the special key.
-        BOOL isKeyed = (key.length > 0);
         BOOL isEmpty = (self.topJSONObjects.count == 0);
         
         //! In some simple (but typical) cases, we don’t even need to archive list of root objects.

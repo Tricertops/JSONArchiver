@@ -53,7 +53,9 @@ int main(__unused int argc, __unused const char * argv[]) {
         
         var archiver = [JSONArchiver new];
         archiver.shouldPrettyPrint = YES;
+        archiver.shouldCompactRoot = YES;;
         archiver.shouldIncludeDebuggingInfo = YES;
+        archiver.shouldOmitNulls = YES;
         
         [archiver encodeObject:testA];
         

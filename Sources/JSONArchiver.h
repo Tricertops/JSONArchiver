@@ -33,6 +33,8 @@ FOUNDATION_EXPORT const unsigned char JSONArchiverVersionString[];
 @property BOOL shouldCompactRoot;
 //! Defaults value is NO. If set to YES, extra keys will be added to root objects for easier human inspection.
 @property BOOL shouldIncludeDebuggingInfo;
+//! Defaults value is NO, so encoding nil object produces JSON null. If set to YES, unnecesary keys are not produced. This doesn’t affect NSNull.
+@property BOOL shouldOmitNulls;
 
 //! Contains valid JSON object after encoding any number of root objects.
 @property (readonly) id JSON;
