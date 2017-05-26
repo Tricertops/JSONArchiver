@@ -142,6 +142,11 @@
 //! Indexes for objects in top-level object array that should be nullified during finalization.
 @property (readonly) NSMutableIndexSet *conditionalTopIndexes;
 
+//! Map used to look-up indexes for identical objects, crucial for archivation of cyclic graphs.
+@property (readonly) NSMapTable<id<NSCoding>, NSNumber *> *identityLookup;
+//! Map used to look-up indexes for equal objects. Purely optimization.
+@property (readonly) NSMapTable<id<NSCoding>, NSNumber *> *equalityLookup;
+
 //! Container that holds root objects. When needed, it is archived as top-level object.
 @property (readonly) JSONArchiverKeyedContainer *rootContainer;
 //! Flag that indicates whether the root container needs to be archived.
@@ -203,6 +208,12 @@
     
     self->_topJSONObjects = [NSMutableArray new];
     self->_conditionalTopIndexes = [NSMutableIndexSet new];
+    
+    let objectIdentity = (NSPointerFunctionsStrongMemory | NSPointerFunctionsObjectPointerPersonality);
+    let objectEquality = (NSPointerFunctionsStrongMemory | NSPointerFunctionsObjectPersonality);
+    self->_identityLookup = [NSMapTable mapTableWithKeyOptions:objectIdentity valueOptions:objectEquality];
+    self->_equalityLookup = [NSMapTable mapTableWithKeyOptions:objectEquality valueOptions:objectEquality];
+    
     self->_rootContainer = [JSONArchiverKeyedContainer new];
     self->_nestedContainers = [NSMutableArray new];
     
@@ -311,15 +322,30 @@
         return;
     }
     
-    //TODO: Find existing top-level object and use its reference.
-    //TODO: Find how NSKeyedArchiver treats -isEqual: objects.
-    //TODO: If object is referenced, remove it from conditional objects (replace with null).
-    //TODO: For large NSString/NSData/NSArray, even if there is equal mutable copy, reuse it.
+    //! Try finding this object in existing top-level list using identity and equality.
+    let existingIndex = [self.identityLookup objectForKey:object] ?: [self.equalityLookup objectForKey:object];
+    if (existingIndex != nil) {
+        //! Once referenced unconditionally, remove it from conditional indexes.
+        if ( ! isConditional) {
+            [self.conditionalTopIndexes removeIndex:existingIndex.unsignedIntegerValue];
+        }
+        //! Store reference and we are done.
+        [self.currentContainer storeJSONObject:@{ @"#ref": existingIndex } forKey:key];
+        return;
+    }
     
     //! We need to create new top-level object.
     var container = [JSONArchiverKeyedContainer new];
     let index = self.topJSONObjects.count;
     [self.topJSONObjects addObject:container.dictionary];
+    
+    //! Remember this object for future deduplication.
+    [self.identityLookup setObject:@(index) forKey:object];
+    if (   class == NSString.class
+        || class == NSData.class) {
+        //TODO: We could also deduplicate mutable classes with extra info for decoder.
+        [self.equalityLookup setObject:@(index) forKey:object];
+    }
     
     //! Include some debugging info for humans.
     if (self.shouldIncludeDebuggingInfo) {
@@ -437,11 +463,6 @@
     if (class == NSString.class) {
         let string = (NSString *)object;
         return (string.length > 512? nil : string);
-    }
-    //! NSArrays are direct, but only immutable up to certain size.
-    if (class == NSArray.class) {
-        let array = (NSArray *)object;
-        return (array.count > 16? nil : array);
     }
     //! NSData needs special JSON object that holds base64 encoded data.
     if (class == NSData.class) {

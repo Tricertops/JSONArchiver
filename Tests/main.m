@@ -29,14 +29,8 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:[NSDate new] forKey:@"date"];
-    [encoder encodeObject:[NSURL URLWithString:@"http://apple.com"] forKey:@"URL"];
-    [encoder encodeObject:@{
-                            @"A": @"B",
-                            @"C": @"D",
-                            @"E": @"F",
-                            @"G": @"H",
-                            } forKey:@"set"];
+    [encoder encodeObject:self.title forKey:@"title"];
+    [encoder encodeObject:self.next forKey:@"next"];
 }
 
 @end
@@ -45,25 +39,22 @@
 int main(__unused int argc, __unused const char * argv[]) {
     @autoreleasepool {
         
+        let title = @"Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
+        
         var testA = [TestObject new];
-        testA.title = @"A";
-        
         var testB = [TestObject new];
-        testB.title = @"B";
-        
-        var testC = [TestObject new];
-        testC.title = @"C";
-        
+        testA.title = [title mutableCopy];
+        testB.title = [title mutableCopy];
         testA.next = testB;
-        testB.next = testC;
+        testB.next = testA;
         
         var archiver = [JSONArchiver new];
         archiver.shouldPrettyPrint = YES;
         //archiver.shouldCompactRoot = YES;;
-        archiver.shouldIncludeDebuggingInfo = YES;
+        //archiver.shouldIncludeDebuggingInfo = YES;
         //archiver.shouldOmitNulls = YES;
         
-        [archiver encodeObject:testC];
+        [archiver encodeRootObject:testA];
         
         NSLog(@"JSON:\n%@", archiver.JSONString);
     }
