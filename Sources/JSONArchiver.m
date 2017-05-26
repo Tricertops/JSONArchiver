@@ -341,7 +341,8 @@
     [container storeJSONObject:NSStringFromClass(class) forKey:@"#class"];
     
     //! Some classes can be too big to be replaced nested value, so we handle their top-level behavior.
-    if ([class isSubclassOfClass:NSString.class]) {
+    if (   class == NSString.class
+        || class == NSMutableString.class) {
         //! Default implementation of NSString stores underlaying bytes.
         let string = (NSString *)object;
         [container storeJSONObject:[string copy] forKey:@"#contents"];
@@ -350,9 +351,12 @@
             [container storeJSONObject:@(string.length) forKey:@"#length"];
         }
     }
-    else if (   [class isSubclassOfClass:NSArray.class]
-             || [class isSubclassOfClass:NSSet.class]
-             || [class isSubclassOfClass:NSOrderedSet.class]) {
+    else if (   class == NSArray.class
+             || class == NSSet.class
+             || class == NSOrderedSet.class
+             || class == NSMutableArray.class
+             || class == NSMutableSet.class //! Not NSCountedSet, it has extra components.
+             || class == NSMutableOrderedSet.class) {
         //! Default implementations of these classes store all objects as keys. We create special indexed container encode all objects in it.
         var indexedContainer = [JSONArchiverIndexedContainer new];
         [self.nestedContainers addObject:indexedContainer];
@@ -368,7 +372,8 @@
             [container storeJSONObject:@(((NSArray *)object).count) forKey:@"#count"];
         }
     }
-    else if ([class isSubclassOfClass:NSDictionary.class]) {
+    else if (   class == NSDictionary.class
+             || class == NSMutableDictionary.class) {
         //! Default implementation of NSDictionary stores all keys and values under keys.
         let dictionary = (NSDictionary *)object;
         let keys = dictionary.allKeys;
@@ -377,7 +382,8 @@
         [self internalEncodeObject:values forKey:@"#values" conditional:NO];
         //! We could push this further and if the dictionary keys are all NSStrings, use native JSON structure.
     }
-    else if ([class isSubclassOfClass:NSData.class]) {
+    else if (   class == NSData.class
+             || class == NSMutableData.class) {
         //! Default implementation of NSData invokes -encodeBytes:length:forKey:, which produces recursion.
         let data = (NSData *)object;
         [container storeJSONObject:[self base64:data] forKey:@"#base64"];
