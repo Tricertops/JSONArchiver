@@ -1,9 +1,12 @@
 //
 //  main.m
-//  JSONArchiver
+//  JSON Archiver
 //
 //  Created by Martin Kiss on 25 May 2017.
-//  Copyright © 2017 Tricertops. All rights reserved.
+//  https://github.com/Tricertops/JSONArchiver
+//
+//  The MIT License (MIT)
+//  Copyright © 2017 Martin Kiss
 //
 
 @import Foundation;
