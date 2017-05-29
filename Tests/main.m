@@ -14,23 +14,27 @@
 #define let  __auto_type const
 
 
-@interface TestObject : NSObject <NSCoding>
+@interface Person : NSObject <NSCoding>
 
-@property NSString *title;
-@property TestObject *next;
+@property NSString *name;
+@property NSInteger age;
+@property Person *partner;
+@property NSArray<Person *> *children;
 
 @end
 
 
-@implementation TestObject
+@implementation Person
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(__unused NSCoder *)decoder {
     return [self init];
 }
 
 - (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:self.title forKey:@"title"];
-    [encoder encodeObject:self.next forKey:@"next"];
+    [encoder encodeObject:self.name forKey:@"name"];
+    [encoder encodeInteger:self.age forKey:@"age"];
+    [encoder encodeObject:self.partner forKey:@"partner"];
+    [encoder encodeObject:self.children forKey:@"children"];
 }
 
 @end
@@ -39,22 +43,35 @@
 int main(__unused int argc, __unused const char * argv[]) {
     @autoreleasepool {
         
-        let title = @"Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
+        var mom = [Person new];
+        mom.name = @"Mom";
+        mom.age = 45;
         
-        var testA = [TestObject new];
-        var testB = [TestObject new];
-        testA.title = [title mutableCopy];
-        testB.title = [title mutableCopy];
-        testA.next = testB;
-        testB.next = testA;
+        var dad = [Person new];
+        dad.name = @"Dad";
+        dad.age = 48;
+        
+        var alex = [Person new];
+        alex.name = @"Alex";
+        alex.age = 8;
+        
+        var chris = [Person new];
+        chris.name = @"Chris";
+        chris.age = 4;
+        
+        mom.partner = dad;
+        dad.partner = mom;
+        mom.children = @[alex, chris];
+        dad.children = mom.children;
+        
         
         var archiver = [JSONArchiver new];
-        archiver.shouldPrettyPrint = YES;
-        //archiver.shouldCompactRoot = YES;;
-        //archiver.shouldIncludeDebuggingInfo = YES;
-        //archiver.shouldOmitNulls = YES;
+        archiver.shouldPrettyPrint = YES; // Default is NO.
+        //archiver.shouldCompactRoot = NO; // Default is YES.
+        //archiver.shouldIncludeDebuggingInfo = YES; // Default is NO.
+        //archiver.shouldOmitNulls = YES; // Default is NO.
         
-        [archiver encodeRootObject:testA];
+        [archiver encodeRootObject:@[mom,dad]];
         
         NSLog(@"JSON:\n%@", archiver.JSONString);
     }
